@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f0f">
+<title>Daily Tracker</title>
+<style>
+:root {
+  --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #242424; --surface3: #2e2e2e;
+  --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+  --text: #f0f0f0; --muted: #777; --accent: #4a9eff; --accent-dim: rgba(74,158,255,0.12);
+  --green: #4caf7d; --green-dim: rgba(76,175,125,0.12);
+  --yellow: #ffcc4a; --yellow-dim: rgba(255,204,74,0.1);
+  --danger: #ff5f5f; --danger-dim: rgba(255,95,95,0.1);
+  --r: 14px; --r-sm: 9px; --tab-h: 56px; --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 15px; overscroll-behavior: none; }
+#app { display: flex; flex-direction: column; height: 100%; max-width: 480px; margin: 0 auto; }
+.topbar { padding: max(env(safe-area-inset-top, 14px), 14px) 16px 10px; background: var(--bg); border-bottom: 0.5px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+.topbar h1 { font-size: 19px; font-weight: 600; letter-spacing: -0.3px; }
+.topbar h1 span { color: var(--accent); }
+.topbar-date { font-size: 12px; color: var(--muted); }
+.pages { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 14px calc(var(--tab-h) + var(--safe-bottom) + 14px); }
+.page { display: none; } .page.active { display: block; }
+.tabbar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; display: flex; background: rgba(15,15,15,0.94); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid var(--border); padding-bottom: var(--safe-bottom); z-index: 50; }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px 2px; cursor: pointer; border: none; background: none; color: var(--muted); font-size: 9px; font-weight: 500; letter-spacing: 0.02em; transition: color .15s; min-height: var(--tab-h); }
+.tab svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.tab.active { color: var(--accent); }
+/* Form */
+.field-label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
+input[type=text], input[type=number], input[type=time], input[type=date], textarea {
+  width: 100%; background: var(--surface2); border: 0.5px solid var(--border2); border-radius: var(--r-sm);
+  color: var(--text); font-size: 15px; padding: 11px 13px; outline: none; appearance: none; -webkit-appearance: none; font-family: inherit;
+}
+input:focus, textarea:focus { border-color: var(--accent); }
+textarea { resize: none; line-height: 1.5; }
+/* Cards */
+.card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r); padding: 14px 16px; margin-bottom: 10px; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+/* Section label */
+.section-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; margin-top: 20px; }
+.section-label:first-child { margin-top: 0; }
+/* Time row */
+.time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.time-grid > div { display: flex; flex-direction: column; gap: 5px; }
+/* Hours row */
+.hours-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.hours-grid > div { display: flex; flex-direction: column; gap: 5px; }
+/* Toggle (yes/no) */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
+.toggle-row:last-child { border-bottom: none; padding-bottom: 0; }
+.toggle-row:first-child { padding-top: 0; }
+.toggle-label { font-size: 14px; font-weight: 500; }
+.toggle-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.toggle-btn { width: 48px; height: 28px; border-radius: 14px; background: var(--surface3); border: 0.5px solid var(--border2); cursor: pointer; position: relative; transition: background .2s; flex-shrink: 0; }
+.toggle-btn.on { background: var(--green); border-color: var(--green); }
+.toggle-btn::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.toggle-btn.on::after { transform: translateX(20px); }
+/* Streak cards */
+.streak-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.streak-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r); padding: 14px; text-align: center; }
+.streak-card.active { border-color: rgba(76,175,125,0.4); background: var(--green-dim); }
+.streak-card.broken { border-color: rgba(255,95,95,0.3); background: var(--danger-dim); }
+.streak-num { font-size: 32px; font-weight: 700; letter-spacing: -1px; color: var(--green); }
+.streak-card.broken .streak-num { color: var(--danger); }
+.streak-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+.streak-days { font-size: 10px; color: var(--muted); margin-top: 4px; }
+/* Btn */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 13px 18px; border-radius: var(--r-sm); font-size: 15px; font-weight: 500; cursor: pointer; border: none; transition: opacity .15s, transform .1s; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--accent); color: #fff; width: 100%; }
+.btn-primary:active { opacity: .85; }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 0.5px solid var(--border2); width: 100%; }
+.btn-green { background: var(--green); color: #fff; width: 100%; }
+/* Date nav */
+.date-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.date-nav-label { flex: 1; text-align: center; font-size: 13px; font-weight: 600; }
+.date-nav-btn { background: var(--surface2); border: 0.5px solid var(--border2); border-radius: var(--r-sm); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.date-nav-btn svg { width: 16px; height: 16px; stroke: var(--muted); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+/* Weekly summary */
+.summary-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 0.5px solid var(--border); font-size: 14px; }
+.summary-row:last-child { border-bottom: none; }
+.summary-val { font-weight: 600; color: var(--accent); }
+.summary-val.green { color: var(--green); }
+.summary-val.yellow { color: var(--yellow); }
+/* Empty */
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); font-size: 13px; }
+.empty-icon { font-size: 32px; margin-bottom: 10px; }
+/* Settings */
+.settings-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; border-bottom: 0.5px solid var(--border); }
+.settings-row:last-child { border-bottom: none; }
+.settings-label { font-size: 14px; font-weight: 500; }
+.settings-input { width: 80px; text-align: center; padding: 8px 10px; font-size: 14px; }
+/* wins */
+.wins-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.win-row { display: flex; gap: 6px; align-items: center; }
+.win-row input { flex: 1; margin-bottom: 0; }
+.win-rm { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
+.add-win-btn { display: flex; align-items: center; gap: 6px; background: none; border: 0.5px dashed var(--border2); border-radius: var(--r-sm); width: 100%; padding: 10px; color: var(--muted); font-size: 13px; cursor: pointer; justify-content: center; margin-bottom: 10px; }
+/* day score */
+.day-score { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 14px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--r); margin-bottom: 10px; }
+.day-score-num { font-size: 36px; font-weight: 700; letter-spacing: -1px; }
+.day-score-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <h1>Daily <span>Tracker</span></h1>
+    <div class="topbar-date" id="topbar-date"></div>
+  </div>
+  <div class="pages" id="pages">
+
+    <!-- LOG -->
+    <div class="page active" id="page-log">
+      <div class="date-nav">
+        <button class="date-nav-btn" onclick="shiftLogDay(-1)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="date-nav-label" id="log-date-label">—</div>
+        <button class="date-nav-btn" onclick="shiftLogDay(1)"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+
+      <!-- Streaks -->
+      <div class="streak-grid" id="streak-grid"></div>
+
+      <!-- Sleep -->
+      <div class="card">
+        <div class="card-title">Sleep</div>
+        <div class="time-grid">
+          <div><span class="field-label">Wake up</span><input type="time" id="log-wake"></div>
+          <div><span class="field-label">Bed time</span><input type="time" id="log-bed"></div>
+        </div>
+      </div>
+
+      <!-- Hours -->
+      <div class="card">
+        <div class="card-title">Hours</div>
+        <div class="hours-grid">
+          <div><span class="field-label">Productive</span><input type="number" id="log-productive" min="0" max="24" step="0.5" placeholder="0"></div>
+          <div><span class="field-label">Gym</span><input type="number" id="log-gym" min="0" max="8" step="0.25" placeholder="0"></div>
+        </div>
+        <div class="hours-grid">
+          <div><span class="field-label">Outside</span><input type="number" id="log-outside" min="0" max="24" step="0.25" placeholder="0"></div>
+          <div><span class="field-label">Social media</span><input type="number" id="log-social" min="0" max="24" step="0.25" placeholder="0"></div>
+        </div>
+      </div>
+
+      <!-- Habits -->
+      <div class="card">
+        <div class="card-title">Habits</div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Meditated</div></div>
+          <button class="toggle-btn" id="tog-meditate" onclick="toggleHabit('meditate')"></button>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">No porn</div><div class="toggle-sub" id="streak-label-porn"></div></div>
+          <button class="toggle-btn" id="tog-porn" onclick="toggleHabit('porn')"></button>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">No weed</div><div class="toggle-sub" id="streak-label-weed"></div></div>
+          <button class="toggle-btn" id="tog-weed" onclick="toggleHabit('weed')"></button>
+        </div>
+      </div>
+
+      <!-- Wins -->
+      <div class="card">
+        <div class="card-title">Today's wins</div>
+        <div class="wins-list" id="wins-list"></div>
+        <button class="add-win-btn" onclick="addWinRow()">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add win
+        </button>
+      </div>
+
+      <!-- Journal -->
+      <div class="card">
+        <div class="card-title">Journal</div>
+        <textarea id="log-journal" rows="5" placeholder="How did today go? What's on your mind?"></textarea>
+      </div>
+
+      <!-- Tomorrow -->
+      <div class="card">
+        <div class="card-title">Plan for tomorrow</div>
+        <textarea id="log-tomorrow" rows="4" placeholder="What do you want to accomplish tomorrow?"></textarea>
+      </div>
+
+      <button class="btn btn-green" onclick="saveLog()" style="margin-top:4px">Save day</button>
+    </div>
+
+    <!-- WEEKLY -->
+    <div class="page" id="page-weekly">
+      <div class="date-nav">
+        <button class="date-nav-btn" onclick="shiftWeeklySummary(-1)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="date-nav-label" id="weekly-label">—</div>
+        <button class="date-nav-btn" onclick="shiftWeeklySummary(1)"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+      <div id="weekly-content"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="section-label" style="margin-top:0">Streak starting points</div>
+      <div class="card">
+        <div class="settings-row">
+          <div class="settings-label">No porn — current streak</div>
+          <input type="number" class="settings-input" id="set-porn-streak" min="0" step="1" placeholder="0">
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">No weed — current streak</div>
+          <input type="number" class="settings-input" id="set-weed-streak" min="0" step="1" placeholder="0">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:4px">Save settings</button>
+      <div class="section-label">About</div>
+      <div class="card" style="font-size:13px;color:var(--muted);line-height:1.6">
+        Your data is stored locally on this device. Nothing is sent anywhere.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tabbar">
+    <button class="tab active" onclick="showPage('log')" id="tab-log">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Today
+    </button>
+    <button class="tab" onclick="showPage('weekly')" id="tab-weekly">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Weekly
+    </button>
+    <button class="tab" onclick="showPage('settings')" id="tab-settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings
+    </button>
+  </div>
+</div>
+
+<script>
+var db = loadDB();
+var logDayOffset = 0;
+var weeklyOffset = 0;
+
+function loadDB() {
+  try { var s = localStorage.getItem('dailytracker_v1'); if (s) return JSON.parse(s); } catch(e) {}
+  return { days: {}, settings: { pornStreak: 0, weedStreak: 0 } };
+}
+function saveDB() { try { localStorage.setItem('dailytracker_v1', JSON.stringify(db)); } catch(e) {} }
+
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function offsetDate(offset) {
+  var d = new Date(); d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0,10);
+}
+function fmtDate(dateStr) {
+  var d = new Date(dateStr + 'T12:00:00');
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var isToday = dateStr === todayStr();
+  return (isToday ? 'Today — ' : days[d.getDay()] + ', ') + months[d.getMonth()] + ' ' + d.getDate();
+}
+
+function getDay(date) {
+  if (!db.days[date]) db.days[date] = { wake:'', bed:'', productive:null, gym:null, outside:null, social:null, meditate:false, porn:true, weed:true, wins:[], journal:'', tomorrow:'' };
+  return db.days[date];
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+  document.getElementById('pages').scrollTop = 0;
+  if (id === 'log') renderLogPage();
+  if (id === 'weekly') renderWeekly();
+  if (id === 'settings') renderSettings();
+}
+
+function shiftLogDay(dir) { logDayOffset += dir; if (logDayOffset > 0) logDayOffset = 0; renderLogPage(); }
+function shiftWeeklySummary(dir) { weeklyOffset += dir; if (weeklyOffset > 0) weeklyOffset = 0; renderWeekly(); }
+
+/* ---- STREAKS ---- */
+function computeStreak(habit, upToDate) {
+  // Count consecutive days up to and including upToDate where habit was maintained
+  // habit is 'porn' or 'weed' (true = maintained)
+  var count = 0;
+  var d = new Date(upToDate + 'T12:00:00');
+  // First check settings baseline
+  var baseline = habit === 'porn' ? (db.settings.pornStreak||0) : (db.settings.weedStreak||0);
+  // Find earliest logged date
+  var dates = Object.keys(db.days).sort();
+  if (!dates.length) return baseline;
+  // Walk backwards from upToDate
+  while (true) {
+    var ds = d.toISOString().slice(0,10);
+    if (db.days[ds]) {
+      if (db.days[ds][habit] === false) break; // broken
+      count++;
+    } else {
+      // No entry for this day — treat as maintained if within baseline window
+      count++;
+    }
+    d.setDate(d.getDate()-1);
+    // Stop after going back far enough
+    if (count > 3650) break;
+  }
+  return Math.max(count, 0);
+}
+
+function computeStreakFromStart(habit, upToDate) {
+  // Simple: baseline + days logged as maintained since first log
+  var baseline = habit === 'porn' ? (db.settings.pornStreak||0) : (db.settings.weedStreak||0);
+  var dates = Object.keys(db.days).sort();
+  if (!dates.length) return {count: baseline, broken: false};
+  // Walk from upToDate backwards, count consecutive maintained days in db
+  var d = new Date(upToDate + 'T12:00:00');
+  var loggedDays = 0;
+  var broken = false;
+  for (var i = 0; i < 365; i++) {
+    var ds = d.toISOString().slice(0,10);
+    if (db.days[ds]) {
+      if (db.days[ds][habit] === false) { broken = true; break; }
+      loggedDays++;
+    }
+    d.setDate(d.getDate()-1);
+  }
+  if (broken) return {count: 0, broken: true};
+  return {count: baseline + loggedDays, broken: false};
+}
+
+function renderStreakGrid(date) {
+  var pornS = computeStreakFromStart('porn', date);
+  var weedS = computeStreakFromStart('weed', date);
+  var grid = document.getElementById('streak-grid');
+  grid.innerHTML =
+    '<div class="streak-card '+(pornS.broken?'broken':'active')+'">'+
+      '<div class="streak-num">'+(pornS.broken?'0':pornS.count)+'</div>'+
+      '<div class="streak-label">No porn</div>'+
+      '<div class="streak-days">'+(pornS.broken?'streak broken':'days</div>')+'</div>'+
+    '</div>'+
+    '<div class="streak-card '+(weedS.broken?'broken':'active')+'">'+
+      '<div class="streak-num">'+(weedS.broken?'0':weedS.count)+'</div>'+
+      '<div class="streak-label">No weed</div>'+
+      '<div class="streak-days">'+(weedS.broken?'streak broken':'days')+'</div>'+
+    '</div>';
+}
+
+/* ---- LOG PAGE ---- */
+function renderLogPage() {
+  var date = offsetDate(logDayOffset);
+  document.getElementById('log-date-label').textContent = fmtDate(date);
+  document.getElementById('topbar-date').textContent = date;
+  var day = getDay(date);
+
+  document.getElementById('log-wake').value = day.wake || '';
+  document.getElementById('log-bed').value = day.bed || '';
+  document.getElementById('log-productive').value = day.productive !== null ? day.productive : '';
+  document.getElementById('log-gym').value = day.gym !== null ? day.gym : '';
+  document.getElementById('log-outside').value = day.outside !== null ? day.outside : '';
+  document.getElementById('log-social').value = day.social !== null ? day.social : '';
+  document.getElementById('log-journal').value = day.journal || '';
+  document.getElementById('log-tomorrow').value = day.tomorrow || '';
+
+  setToggle('tog-meditate', day.meditate);
+  setToggle('tog-porn', day.porn !== false);
+  setToggle('tog-weed', day.weed !== false);
+
+  renderStreakGrid(date);
+  renderWins(day.wins || []);
+}
+
+function setToggle(id, on) {
+  var btn = document.getElementById(id);
+  if (on) btn.classList.add('on'); else btn.classList.remove('on');
+}
+
+function toggleHabit(habit) {
+  var date = offsetDate(logDayOffset);
+  var day = getDay(date);
+  if (habit === 'meditate') { day.meditate = !day.meditate; setToggle('tog-meditate', day.meditate); }
+  if (habit === 'porn') { day.porn = (day.porn === false) ? true : false; setToggle('tog-porn', day.porn !== false); }
+  if (habit === 'weed') { day.weed = (day.weed === false) ? true : false; setToggle('tog-weed', day.weed !== false); }
+  renderStreakGrid(date);
+}
+
+function renderWins(wins) {
+  var list = document.getElementById('wins-list');
+  list.innerHTML = '';
+  wins.forEach(function(w, i) {
+    var row = document.createElement('div'); row.className = 'win-row';
+    row.innerHTML = '<input type="text" placeholder="A win from today..." value="'+escHtml(w)+'"><button class="win-rm" onclick="removeWin('+i+')">×</button>';
+    list.appendChild(row);
+  });
+}
+
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function addWinRow() {
+  var date = offsetDate(logDayOffset);
+  var day = getDay(date);
+  day.wins = day.wins || [];
+  day.wins.push('');
+  renderWins(day.wins);
+  // Focus last input
+  var inputs = document.getElementById('wins-list').querySelectorAll('input');
+  if (inputs.length) inputs[inputs.length-1].focus();
+}
+
+function removeWin(i) {
+  var date = offsetDate(logDayOffset);
+  var day = getDay(date);
+  day.wins.splice(i, 1);
+  renderWins(day.wins);
+}
+
+function saveLog() {
+  var date = offsetDate(logDayOffset);
+  var day = getDay(date);
+  day.wake = document.getElementById('log-wake').value;
+  day.bed = document.getElementById('log-bed').value;
+  day.productive = parseFloat(document.getElementById('log-productive').value) || null;
+  day.gym = parseFloat(document.getElementById('log-gym').value) || null;
+  day.outside = parseFloat(document.getElementById('log-outside').value) || null;
+  day.social = parseFloat(document.getElementById('log-social').value) || null;
+  day.journal = document.getElementById('log-journal').value;
+  day.tomorrow = document.getElementById('log-tomorrow').value;
+  // Save wins from inputs
+  var winInputs = document.getElementById('wins-list').querySelectorAll('input');
+  day.wins = [];
+  winInputs.forEach(function(inp){ if(inp.value.trim()) day.wins.push(inp.value.trim()); });
+  saveDB();
+  // Flash button
+  var btn = document.querySelector('#page-log .btn-green');
+  var orig = btn.textContent; btn.textContent = '✓ Saved!'; btn.style.background = '#2d8a5e';
+  setTimeout(function(){ btn.textContent = orig; btn.style.background = ''; }, 1400);
+  renderStreakGrid(date);
+}
+
+/* ---- WEEKLY SUMMARY ---- */
+function getWeekStartFromOffset(weekOffset) {
+  var now = new Date();
+  var day = now.getDay();
+  var diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  var monday = new Date(now); monday.setDate(diff + weekOffset * 7); monday.setHours(0,0,0,0);
+  return monday;
+}
+
+function renderWeekly() {
+  var weekStart = getWeekStartFromOffset(weeklyOffset);
+  var weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+  var fmt = function(d){ return (d.getMonth()+1)+'/'+d.getDate(); };
+  document.getElementById('weekly-label').textContent = fmt(weekStart)+' – '+fmt(weekEnd);
+
+  var days = [];
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(weekStart); d.setDate(d.getDate()+i);
+    var ds = d.toISOString().slice(0,10);
+    if (db.days[ds]) days.push({date: ds, data: db.days[ds]});
+  }
+
+  var content = document.getElementById('weekly-content');
+  if (!days.length) {
+    content.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>No data logged this week yet.</div>';
+    return;
+  }
+
+  // Compute averages/totals
+  var n = days.length;
+  function avg(field) {
+    var vals = days.map(function(d){ return d.data[field]; }).filter(function(v){ return v !== null && v !== undefined; });
+    if (!vals.length) return null;
+    return Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length * 10)/10;
+  }
+  function pct(field) {
+    var count = days.filter(function(d){ return d.data[field] === true || d.data[field] !== false; }).length;
+    return Math.round(count/n*100);
+  }
+  function medPct() {
+    var count = days.filter(function(d){ return d.data.meditate; }).length;
+    return Math.round(count/n*100);
+  }
+  function streakStatus(habit) {
+    var broken = days.some(function(d){ return d.data[habit] === false; });
+    return broken ? '❌ broken this week' : '✅ maintained';
+  }
+
+  var wakeAvg = avg('wake') !== null ? avg('wake') : null;
+
+  // Average wake time (as time strings)
+  function avgTime(field) {
+    var times = days.map(function(d){ return d.data[field]; }).filter(function(v){ return v && v.length; });
+    if (!times.length) return null;
+    var mins = times.map(function(t){ var p=t.split(':'); return parseInt(p[0])*60+parseInt(p[1]); });
+    var avgMin = Math.round(mins.reduce(function(a,b){return a+b;},0)/mins.length);
+    var h = Math.floor(avgMin/60)%24;
+    var m = avgMin%60;
+    return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+  }
+
+  var wakeTime = avgTime('wake');
+  var bedTime = avgTime('bed');
+
+  content.innerHTML =
+    '<div class="card"><div class="card-title">This week — '+n+' day'+(n!==1?'s':'')+' logged</div>'+
+    '<div class="summary-row"><span>Avg wake time</span><span class="summary-val">'+(wakeTime||'—')+'</span></div>'+
+    '<div class="summary-row"><span>Avg bed time</span><span class="summary-val">'+(bedTime||'—')+'</span></div>'+
+    '<div class="summary-row"><span>Avg productive hours</span><span class="summary-val green">'+(avg('productive')!==null?avg('productive')+'h':'—')+'</span></div>'+
+    '<div class="summary-row"><span>Avg gym hours</span><span class="summary-val green">'+(avg('gym')!==null?avg('gym')+'h':'—')+'</span></div>'+
+    '<div class="summary-row"><span>Avg time outside</span><span class="summary-val green">'+(avg('outside')!==null?avg('outside')+'h':'—')+'</span></div>'+
+    '<div class="summary-row"><span>Avg social media</span><span class="summary-val yellow">'+(avg('social')!==null?avg('social')+'h':'—')+'</span></div>'+
+    '<div class="summary-row"><span>Meditated</span><span class="summary-val green">'+medPct()+'%</span></div>'+
+    '<div class="summary-row"><span>No porn</span><span class="summary-val">'+streakStatus('porn')+'</span></div>'+
+    '<div class="summary-row"><span>No weed</span><span class="summary-val">'+streakStatus('weed')+'</span></div>'+
+    '</div>'+
+    // Show journal entries
+    (days.filter(function(d){return d.data.journal&&d.data.journal.trim();}).length ?
+      '<div class="section-label">Journal entries</div>'+
+      days.filter(function(d){return d.data.journal&&d.data.journal.trim();}).map(function(d){
+        return '<div class="card"><div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px">'+fmtDate(d.date)+'</div><div style="font-size:13px;line-height:1.6;color:var(--text)">'+escHtml(d.data.journal)+'</div></div>';
+      }).join('') : '')+
+    // Tomorrow plans
+    (days.filter(function(d){return d.data.tomorrow&&d.data.tomorrow.trim();}).length ?
+      '<div class="section-label">Plans written</div>'+
+      days.filter(function(d){return d.data.tomorrow&&d.data.tomorrow.trim();}).map(function(d){
+        return '<div class="card"><div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px">'+fmtDate(d.date)+' — for next day</div><div style="font-size:13px;line-height:1.6;color:var(--text)">'+escHtml(d.data.tomorrow)+'</div></div>';
+      }).join('') : '');
+}
+
+/* ---- SETTINGS ---- */
+function renderSettings() {
+  document.getElementById('set-porn-streak').value = db.settings.pornStreak || 0;
+  document.getElementById('set-weed-streak').value = db.settings.weedStreak || 0;
+}
+
+function saveSettings() {
+  db.settings.pornStreak = parseInt(document.getElementById('set-porn-streak').value) || 0;
+  db.settings.weedStreak = parseInt(document.getElementById('set-weed-streak').value) || 0;
+  saveDB();
+  var btn = document.querySelector('#page-settings .btn-primary');
+  var orig = btn.textContent; btn.textContent = '✓ Saved!';
+  setTimeout(function(){ btn.textContent = orig; }, 1400);
+}
+
+/* ---- INIT ---- */
+renderLogPage();
+renderSettings();
+</script>
+</body>
+</html>
